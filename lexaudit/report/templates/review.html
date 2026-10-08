@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка договора — {{ filename }}</title>
+<style>
+:root{font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;color:#20242a;background:#f4f6f8}*{box-sizing:border-box}body{margin:0}header{background:#182433;color:white;padding:20px 28px}header h1{font-size:21px;margin:0 0 8px}.stats{display:flex;gap:18px;flex-wrap:wrap;color:#d9e2ed;font-size:13px}.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;padding:20px;max-width:1500px;margin:auto}.document,.sidebar,.review-card,.manual{background:white;border:1px solid #dce2e8;border-radius:8px}.document{padding:28px;min-width:0}.sidebar{padding:16px;height:max-content;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}.document h2{font-size:20px;margin:26px 0 10px}.document h3{font-size:17px;margin:22px 0 8px}.document p{margin:0 0 12px;white-space:pre-wrap}.document ul{padding-left:25px}.document li{margin:0 0 8px;white-space:pre-wrap}table{border-collapse:collapse;width:100%;margin:14px 0 22px}td,th{border:1px solid #aeb8c3;padding:8px;vertical-align:top;white-space:pre-wrap}.hl{border-radius:2px;cursor:pointer;padding:1px 0}.high{background:#ffd4d4;box-shadow:0 0 0 1px #dc5353}.medium{background:#fff0b8;box-shadow:0 0 0 1px #d6ad39}.low{background:#e4eaff;box-shadow:0 0 0 1px #8798d2}.inline-change{display:inline;background:#fff4d6;border-radius:3px;padding:1px 3px}.inline-change del{color:#a13e3e;background:#ffe0e0;text-decoration-thickness:2px}.inline-change ins{color:#17633b;background:#dff4e7;text-decoration:none;font-weight:600}.change-label{display:inline-block;margin-left:5px;color:#687482;font-size:11px;white-space:nowrap}.sidebar h2{font-size:17px;margin:0 0 12px}.finding-link{display:block;width:100%;text-align:left;padding:10px;margin:0 0 8px;background:#fff;border:1px solid #dce2e8;border-radius:6px;cursor:pointer}.finding-link:hover{background:#f3f6fa}.finding-link strong{display:block}.badge{font-size:11px;text-transform:uppercase;color:#687482}.review-card{position:fixed;right:24px;bottom:20px;width:min(520px,calc(100vw - 32px));max-height:78vh;overflow:auto;padding:20px;box-shadow:0 12px 40px #17253640;z-index:5}.review-card[hidden]{display:none}.review-card h2{font-size:18px;margin:0 0 12px}.review-card p{white-space:pre-wrap}.label{font-weight:650;margin:14px 0 4px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}button,.law-link{font:inherit;padding:8px 11px;border:1px solid #aeb8c3;border-radius:5px;background:white;color:#20242a;cursor:pointer;text-decoration:none}.primary{background:#164f83;color:white;border-color:#164f83}textarea{width:100%;min-height:120px;padding:9px;font:inherit}.feedback{margin-top:14px;border-top:1px solid #e0e4e8;padding-top:12px}.feedback button{font-size:20px}.decision{outline:2px solid #4c9b6a}.manual{margin:20px;padding:20px}.manual h2{font-size:20px}.manual-item{border-top:1px solid #e2e6ea;padding:12px 0;white-space:pre-wrap}.export{position:fixed;right:20px;top:14px;z-index:2}@media(max-width:850px){.layout{grid-template-columns:1fr;padding:10px}.sidebar{position:static;max-height:none;grid-row:1}.document{padding:18px}.export{position:static;margin:10px}.review-card{right:10px;bottom:10px}}
+</style>
+</head>
+<body data-doc-id="{{ doc_id }}">
+<header><h1>{{ filename }}</h1><div class="stats"><span>Дата: {{ report_date }}</span><span>Блоков: {{ block_count }}</span><span>Нарушения: 🔴 {{ severities.high }} · 🟡 {{ severities.medium }} · прочие {{ severities.low }}</span><span>Находок: {{ finding_count }}</span><span>Анализ: {{ "%.2f"|format(duration_s) }} с</span><span>Промпт: {{ prompt_version }}</span></div></header>
+<button class="export" id="export-report">Скачать чистый HTML</button>
+<div class="layout"><main class="document" id="contract">
+{% for item in items %}{% if item.kind == 'table' %}<table data-table="{{ item.table }}"><tbody>{% for row in item.rows %}<tr>{% for block in row %}<td data-block-id="{{ block.block_id }}"{% if block.findings %} data-findings="{{ block.findings|map(attribute='finding_id')|join(',') }}"{% endif %}>{% for span in block.spans %}{% if span.highlight %}<span class="hl {{ span.severity }}" data-finding-ids="{{ span.finding_id|default(block.findings[0].finding_id) }}">{{ span.text }}</span>{% if span.proposed_text %}<span class="inline-change" data-inline-change="{{ span.finding_id }}"><del>{{ span.text }}</del> <ins>{{ span.proposed_text }}</ins><span class="change-label">предлагаемая замена</span></span>{% endif %}{% else %}{{ span.text }}{% endif %}{% endfor %}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
+{% else %}{% set block = item.block %}{% if block.type == 'heading' %}<h2 id="{{ block.block_id }}" data-block-id="{{ block.block_id }}"{% if block.findings %} data-findings="{{ block.findings|map(attribute='finding_id')|join(',') }}"{% endif %}>{% for span in block.spans %}{% if span.highlight %}<span class="hl {{ span.severity }}" data-finding-ids="{{ span.finding_id|default(block.findings[0].finding_id) }}">{{ span.text }}</span>{% if span.proposed_text %}<span class="inline-change" data-inline-change="{{ span.finding_id }}"><del>{{ span.text }}</del> <ins>{{ span.proposed_text }}</ins><span class="change-label">предлагаемая замена</span></span>{% endif %}{% else %}{{ span.text }}{% endif %}{% endfor %}</h2>{% elif block.type == 'list_item' %}<ul><li id="{{ block.block_id }}" data-block-id="{{ block.block_id }}"{% if block.findings %} data-findings="{{ block.findings|map(attribute='finding_id')|join(',') }}"{% endif %}>{% for span in block.spans %}{% if span.highlight %}<span class="hl {{ span.severity }}" data-finding-ids="{{ span.finding_id|default(block.findings[0].finding_id) }}">{{ span.text }}</span>{% if span.proposed_text %}<span class="inline-change" data-inline-change="{{ span.finding_id }}"><del>{{ span.text }}</del> <ins>{{ span.proposed_text }}</ins><span class="change-label">предлагаемая замена</span></span>{% endif %}{% else %}{{ span.text }}{% endif %}{% endfor %}</li></ul>{% else %}<p id="{{ block.block_id }}" data-block-id="{{ block.block_id }}"{% if block.findings %} data-findings="{{ block.findings|map(attribute='finding_id')|join(',') }}"{% endif %}>{% for span in block.spans %}{% if span.highlight %}<span class="hl {{ span.severity }}" data-finding-ids="{{ span.finding_id|default(block.findings[0].finding_id) }}">{{ span.text }}</span>{% if span.proposed_text %}<span class="inline-change" data-inline-change="{{ span.finding_id }}"><del>{{ span.text }}</del> <ins>{{ span.proposed_text }}</ins><span class="change-label">предлагаемая замена</span></span>{% endif %}{% else %}{{ span.text }}{% endif %}{% endfor %}</p>{% endif %}{% endif %}{% endfor %}
+</main><aside class="sidebar"><h2>Находки</h2>{% for finding in findings %}<button class="finding-link" data-open-finding="{{ finding.finding_id }}"><span class="badge">{{ finding.severity }} · {{ finding.confidence }}</span><strong>{{ finding.quote[:100] }}</strong><span>{{ finding.risk_explanation[:160] }}</span></button>{% else %}<p>Находок нет.</p>{% endfor %}</aside></div>
+<section class="manual"><h2>Требует ручной проверки</h2>{% for item in needs_review %}<div class="manual-item"><a href="#{{ item.block.block_id }}">{{ item.block.block_id }}</a> — {{ item.block.text }}{% if item.note %}<br><small>{{ item.note }}</small>{% endif %}</div>{% else %}<p>Блоков для ручной проверки нет.</p>{% endfor %}</section>
+<section class="review-card" id="review-card" hidden><button id="close-card" aria-label="Закрыть">Закрыть</button><div id="card-content"></div></section>
+<script>
+(() => {
+  const docId = document.body.dataset.docId;
+  const key = `lexaudit_${docId}`;
+  const findings = {{ findings|tojson }};
+  let state;
+  try { state = JSON.parse(localStorage.getItem(key) || '{}'); } catch (_) { state = {}; }
+  const persist = () => localStorage.setItem(key, JSON.stringify(state));
+  const card = document.getElementById('review-card');
+  const content = document.getElementById('card-content');
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const findingById = Object.fromEntries(findings.map(f => [f.finding_id, f]));
+  const openFinding = id => {
+    const f = findingById[id]; if (!f) return;
+    const existing = state[f.finding_id] || {};
+    content.innerHTML = `<h2>${esc(f.severity)}: ${esc(f.quote)}</h2><div class="label">Исходный текст</div><p>${esc(f.quote)}</p><div class="label">Предлагаемый текст</div><p>${esc(existing.edited_text ?? f.proposed_text)}</p><div class="label">Обоснование</div><p>${esc(f.risk_explanation)}</p><a class="law-link" href="${esc(f.law_ref.url)}" target="_blank" rel="noopener noreferrer">Открыть источник: ${esc(f.law_ref.act_title)}, статья ${esc(f.law_ref.article)}</a><div class="actions"><button class="primary" data-decision="accepted">Принять</button><button data-decision="rejected">Отклонить</button><button data-edit>Редактировать</button></div><div class="feedback">Полезно? <button data-feedback="up" aria-label="Полезно">👍</button> <button data-feedback="down" aria-label="Не полезно">👎</button></div>`;
+    card.dataset.findingId = f.finding_id; card.hidden = false;
+    content.querySelectorAll('[data-decision]').forEach(btn => btn.onclick = () => { state[f.finding_id] = {...(state[f.finding_id]||{}), decision:btn.dataset.decision}; persist(); applyDecisions(); card.hidden = true; });
+    content.querySelector('[data-edit]').onclick = () => { const proposed=existing.edited_text ?? f.proposed_text; content.querySelector('.label:nth-of-type(2)').insertAdjacentHTML('afterend', `<textarea id="edit-text">${esc(proposed)}</textarea><button class="primary" id="save-edit">Сохранить</button>`); content.querySelector('#save-edit').onclick=()=>{state[f.finding_id]={decision:'edited',edited_text:content.querySelector('#edit-text').value};persist();applyDecisions();openFinding(f.finding_id);}; };
+    content.querySelectorAll('[data-feedback]').forEach(btn => btn.onclick=()=>{state[f.finding_id]={...(state[f.finding_id]||{}),feedback:btn.dataset.feedback};persist();btn.textContent += ' ✓';});
+  };
+  const applyDecisions = () => {
+    document.querySelectorAll('[data-block-id]').forEach(block => {
+      block.classList.remove('decision');
+      const related=findings.filter(f=>f.block_id===block.dataset.blockId);
+      if(!related.length)return;
+      if(!block.dataset.originalText)block.dataset.originalText=block.textContent;
+      let value=block.dataset.originalText, changed=false;
+      related.forEach(f=>{const entry=state[f.finding_id];if(!entry||!['accepted','edited'].includes(entry.decision))return;const repl=entry.decision==='edited'?entry.edited_text:f.proposed_text;const pos=value.toLocaleLowerCase('ru').indexOf(f.quote.toLocaleLowerCase('ru'));value=pos<0?repl:value.slice(0,pos)+repl+value.slice(pos+f.quote.length);changed=true;});
+      if(changed){block.textContent=value;block.classList.add('decision');}
+    });
+  };
+  document.addEventListener('click', event => {
+    const highlight = event.target.closest('.hl');
+    if (highlight) { const id = (highlight.dataset.findingIds||'').split(',')[0]; openFinding(id); return; }
+    const link = event.target.closest('[data-open-finding]'); if (link) { openFinding(link.dataset.openFinding); document.getElementById(findingById[link.dataset.openFinding]?.block_id)?.scrollIntoView({behavior:'smooth',block:'center'}); }
+  });
+  document.getElementById('close-card').onclick=()=>card.hidden=true;
+  document.getElementById('export-report').onclick=()=>{
+    const clone=document.documentElement.cloneNode(true);
+    clone.querySelectorAll('.sidebar,.review-card,#export-report,script').forEach(el=>el.remove());
+    clone.querySelectorAll('.hl').forEach(el=>el.replaceWith(document.createTextNode(el.textContent)));
+    clone.querySelectorAll('[data-block-id]').forEach(el=>{
+      const ids=(el.dataset.findings||'').split(',').filter(Boolean);
+      let value=el.dataset.originalText ?? el.textContent;
+      ids.forEach(id=>{const f=findingById[id], entry=state[id];if(!f||!entry||!['accepted','edited'].includes(entry.decision))return;const repl=entry.decision==='edited'?entry.edited_text:f.proposed_text;const pos=value.toLocaleLowerCase('ru').indexOf(f.quote.toLocaleLowerCase('ru'));value=pos<0?repl:value.slice(0,pos)+repl+value.slice(pos+f.quote.length);});
+      el.textContent=value;el.removeAttribute('data-block-id');el.removeAttribute('data-findings');
+    });
+    const blob=new Blob(['<!doctype html>\n'+clone.outerHTML],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='review_export.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  };
+  applyDecisions();
+})();
+</script>
+</body></html>

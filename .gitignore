@@ -1,0 +1,54 @@
+# Python bytecode, packaging and tooling
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local environments and credentials
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.aws/
+.codex/
+.agents/
+
+# Uploads, caches, traces and generated reports
+/data/
+/logs/
+/out/
+/uploads/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+pii_map.json
+
+# Only generated, reproducible DOCX fixtures belong in the repository
+*.docx
+!tests/fixtures/docx/tourism.docx
+!tests/fixtures/docx/labor.docx
+!tests/fixtures/docx/lease.docx
+!tests/fixtures/docx/clean.docx
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*~
+*.swp
+.~lock.*

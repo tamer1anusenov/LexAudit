@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LexAudit — проверка договора</title>
+  <style>
+    :root{font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:#202833;background:#f2f5f8}*{box-sizing:border-box}body{margin:0}header{background:#172636;color:#fff;padding:24px max(20px,calc((100% - 1040px)/2))}header h1{margin:0;font-size:25px}header p{margin:5px 0 0;color:#d6e0eb}.wrap{max-width:1040px;margin:30px auto;padding:0 18px}.panel{background:#fff;border:1px solid #dce3e9;border-radius:10px;padding:24px;margin-bottom:20px;box-shadow:0 3px 12px #15293a0a}.panel h2{font-size:19px;margin:0 0 16px}.upload-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.upload-row input{max-width:100%}button{font:inherit;background:#155b91;color:white;border:0;border-radius:6px;padding:10px 16px;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.hint{color:#677381;font-size:14px;margin:10px 0 0}.message{min-height:24px;margin-top:10px}.message.error{color:#a52222}.document{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 20px;padding:14px 0;border-top:1px solid #e5e9ed}.document:first-of-type{border-top:0}.document strong{overflow-wrap:anywhere}.meta{color:#667381;font-size:14px}.status{font-size:14px;font-weight:650}.status.failed{color:#a52222}.status.done{color:#27734a}.report{align-self:center;white-space:nowrap;color:#155b91}.empty{color:#687482}.error-text{grid-column:1/-1;color:#a52222;font-size:14px}footer{color:#687482;font-size:13px;text-align:center;padding:10px}@media(max-width:600px){.panel{padding:18px}.document{grid-template-columns:1fr}.report{justify-self:start}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>LexAudit</h1>
+    <p>Проверка договоров по законодательству Республики Казахстан</p>
+  </header>
+  <main class="wrap">
+    <section class="panel" aria-labelledby="upload-title">
+      <h2 id="upload-title">Загрузить договор</h2>
+      <form id="upload-form">
+        <div class="upload-row">
+          <input id="contract-file" name="file" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+          <button id="upload-button" type="submit">Загрузить и проверить</button>
+        </div>
+        <p class="hint">Поддерживается формат DOCX, размер файла — до 10 МБ.</p>
+        <div class="message" id="upload-message" role="status" aria-live="polite"></div>
+      </form>
+    </section>
+    <section class="panel" aria-labelledby="documents-title">
+      <h2 id="documents-title">Документы</h2>
+      <div id="documents-list"><p class="empty">Загруженных документов пока нет.</p></div>
+    </section>
+    <footer>Статусы обновляются автоматически.</footer>
+  </main>
+  <script>
+    (() => {
+      const storageKey = 'lexaudit_documents';
+      const form = document.getElementById('upload-form');
+      const fileInput = document.getElementById('contract-file');
+      const button = document.getElementById('upload-button');
+      const message = document.getElementById('upload-message');
+      const list = document.getElementById('documents-list');
+      let documents = readDocuments();
+      const labels = {
+        queued: 'В очереди', extracting: 'Извлечение текста',
+        classifying: 'Определение области', analyzing: 'Анализ условий',
+        building_report: 'Подготовка отчёта', done: 'Готово', failed: 'Ошибка'
+      };
+
+      function readDocuments() {
+        try { return JSON.parse(localStorage.getItem(storageKey) || '[]'); }
+        catch (_) { return []; }
+      }
+      function saveDocuments() {
+        localStorage.setItem(storageKey, JSON.stringify(documents));
+      }
+      function render() {
+        if (!documents.length) {
+          list.innerHTML = '<p class="empty">Загруженных документов пока нет.</p>';
+          return;
+        }
+        list.innerHTML = documents.map(doc => {
+          const state = labels[doc.status] || doc.status || 'Загрузка статуса';
+          const report = doc.status === 'done'
+            ? `<a class="report" href="/api/documents/${encodeURIComponent(doc.document_id)}/report" target="_blank" rel="noopener">Открыть отчёт</a>` : '';
+          const error = doc.error ? `<div class="error-text">${escapeHtml(doc.error)}</div>` : '';
+          return `<article class="document"><div><strong>${escapeHtml(doc.filename || doc.document_id)}</strong><div class="meta">${escapeHtml(doc.progress || '0/0')}</div></div><div><span class="status ${doc.status === 'done' || doc.status === 'failed' ? doc.status : ''}">${escapeHtml(state)}</span> ${report}</div>${error}</article>`;
+        }).join('');
+      }
+      function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+      }
+      async function refreshStatuses() {
+        await Promise.all(documents.map(async doc => {
+          if (doc.status === 'done' || doc.status === 'failed') return;
+          try {
+            const response = await fetch(`/api/documents/${encodeURIComponent(doc.document_id)}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const status = await response.json();
+            Object.assign(doc, status);
+          } catch (error) {
+            doc.poll_error = 'Не удалось обновить статус. Повторная попытка через 3 секунды.';
+          }
+        }));
+        saveDocuments();
+        render();
+      }
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        message.className = 'message';
+        message.textContent = '';
+        const file = fileInput.files[0];
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.docx')) {
+          message.classList.add('error'); message.textContent = 'Выберите файл DOCX.'; return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          message.classList.add('error'); message.textContent = 'Размер файла не должен превышать 10 МБ.'; return;
+        }
+        button.disabled = true;
+        message.textContent = 'Загрузка…';
+        try {
+          const body = new FormData(); body.append('file', file);
+          const response = await fetch('/api/documents', {method:'POST', body});
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.detail || `Ошибка загрузки: HTTP ${response.status}`);
+          documents = documents.filter(doc => doc.document_id !== result.document_id);
+          documents.unshift({document_id:result.document_id, filename:file.name, status:result.status || 'queued', progress:'0/0'});
+          saveDocuments(); render(); fileInput.value = '';
+          message.textContent = 'Договор добавлен в обработку.';
+          refreshStatuses();
+        } catch (error) {
+          message.classList.add('error'); message.textContent = error.message || 'Не удалось загрузить договор.';
+        } finally { button.disabled = false; }
+      });
+      render();
+      refreshStatuses();
+      window.setInterval(refreshStatuses, 3000);
+    })();
+  </script>
+</body>
+</html>

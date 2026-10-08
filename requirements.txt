@@ -1,0 +1,6 @@
+python-docx
+pytest
+pydantic
+httpx
+pydantic_settings
+rich
